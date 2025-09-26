@@ -33,13 +33,13 @@ def acknowledge(sock, block_count):
 
 
 def send_dirs(sock):
-    block_count = 0
+    block_count = 1
     for path in os.listdir(DIRECTORY_PATH):
         # check if current path is a file
         if os.path.isfile(os.path.join(DIRECTORY_PATH, path)):
-            block_count += 1
             package = (DAT, block_count, len(path), path)
             sock.send(pickle.dump(package))
+            block_count += 1
     # Empty last block to signal transfer is over
     sock.send((DAT, block_count, 0, ""))
 
