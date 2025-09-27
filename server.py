@@ -11,6 +11,7 @@ BUFFER_SIZE = 512
 MAX_PACKAGE_SIZE = 515
 DIRECTORY_PATH = "."
 DIR_COMMAND = ""
+FILE_NOT_FOUND = "File not found"
 
 RRQ = 1
 DAT = 3
@@ -22,8 +23,10 @@ ended = False
 
 dir_list = os.listdir(DIRECTORY_PATH)
 
+
 def closeSocket(sock):
     sock.close()
+
 
 def acknowledge(sock, block_count):
     package = sock.recv(MAX_PACKAGE_SIZE)
@@ -43,27 +46,31 @@ def send_dirs(sock):
     # Empty last block to signal transfer is over
     sock.send((DAT, block_count, 0, ""))
 
+
 def send_file(filename, sock):
-    file = open(filename, "rb")
-    file_size = os.path.getsize(filename)
-    total_blocks = (file_size/BUFFER_SIZE) + 1
-    block_count = 1
-    acknowledged = True
-    while block_count <= total_blocks and acknowledged:
-        if block_count == total_blocks:
-            size = file_size - (BUFFER_SIZE * total_blocks)
-        else:
-            size = BUFFER_SIZE
+    try:
+        file = open(filename, "rb")
+        file_size = os.path.getsize(filename)
+        total_blocks = (file_size/BUFFER_SIZE) + 1
+        block_count = 1
+        acknowledged = True
+        while block_count <= total_blocks and acknowledged:
+            if block_count == total_blocks:
+                size = file_size - (BUFFER_SIZE * total_blocks)
+            else:
+                size = BUFFER_SIZE
 
-        file_data = file.read(BUFFER_SIZE)
-        requested_package = (DAT, block_count, size, file_data)
-        sock.send(pickle.dumps(requested_package))
+            file_data = file.read(BUFFER_SIZE)
+            requested_package = (DAT, block_count, size, file_data)
+            sock.send(pickle.dumps(requested_package))
 
-        acknowledge(sock, block_count)
+            acknowledge(sock, block_count)
 
-        if error:
-            break
-        block_count += 1
+            if error:
+                break
+            block_count += 1
+    except:
+        sock.send(pickle.dumps((ERR, FILE_NOT_FOUND)))
 
 
 
