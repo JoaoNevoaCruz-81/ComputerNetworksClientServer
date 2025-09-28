@@ -4,11 +4,11 @@ import threading
 from socket import *
 import pickle
 
-SERVER_IP = "172.17.0.2"
+SERVER_IP = "172.17.0.3"
 WELCOME_MESSAGE = f"Welcome to {SERVER_IP} file server"
 WELCOME_BLOCKS = 1
 BUFFER_SIZE = 512
-MAX_PACKAGE_SIZE = 515
+MAX_PACKAGE_SIZE = 540
 DIRECTORY_PATH = "."
 DIR_COMMAND = ""
 FILE_NOT_FOUND = "File not found"
@@ -31,8 +31,10 @@ def closeSocket(sock):
 def acknowledge(sock, block_count):
     package = sock.recv(MAX_PACKAGE_SIZE)
     opcode, block_number = pickle.loads(package)
+    print("this is ack")
     if not (opcode == ACK and block_number == block_count):
         error = True
+        print("ERRROR", block_count)
 
 
 def send_dirs(sock):
@@ -41,10 +43,11 @@ def send_dirs(sock):
         # check if current path is a file
         if os.path.isfile(os.path.join(DIRECTORY_PATH, path)):
             package = (DAT, block_count, len(path), path)
-            sock.send(pickle.dump(package))
+            sock.send(pickle.dumps(package))
+            acknowledge(sock, block_count)
             block_count += 1
     # Empty last block to signal transfer is over
-    sock.send((DAT, block_count, 0, ""))
+    sock.send(pickle.dumps((DAT, block_count, 0, "")))
 
 
 def send_file(filename, sock):
@@ -63,7 +66,12 @@ def send_file(filename, sock):
             file_data = file.read(BUFFER_SIZE)
             requested_package = (DAT, block_count, size, file_data)
             sock.send(pickle.dumps(requested_package))
+            rp = pickle.dumps(requested_package)
+            pickle.loads(rp)
+            print(len(rp))
 
+            print(str(file_data))
+            print(block_count)
             acknowledge(sock, block_count)
 
             if error:
@@ -94,7 +102,11 @@ def handle_client(sock):
 
     # Process packages
     while not (error or ended):
-        received_package = pickle.loads(sock.recv(MAX_PACKAGE_SIZE))
+        buffer = sock.recv(MAX_PACKAGE_SIZE)
+        if not buffer:
+            print("Client Disconnected")
+            break
+        received_package = pickle.loads(buffer)
         op_code = received_package[0]
         analyse_package(op_code, received_package, sock)
 
@@ -104,10 +116,14 @@ def main():
         if len(sys.argv) != 2 :
             print("Error: Incorrect number of arguments.")
             sys.exit(1)
-        server_port = sys.argv[1]
-        serverSocket = socket(AF_INET,SOCK_STREAM)
 
-        serverSocket.bind(SERVER_IP, server_port)
+        server_port = sys.argv[1]
+
+        serverSocket = socket(AF_INET,SOCK_STREAM)
+        serverSocket.bind((SERVER_IP, int(server_port)))
+
+        print(server_port)
+
         serverSocket.listen(5)
 
         print("Server is running")
@@ -116,11 +132,12 @@ def main():
             connSocket, client_addr = serverSocket.accept()
 
             print("Connected to: ", str(client_addr))
-            tid = threading.Thread(target=handle_client, args=(connSocket))
+            tid = threading.Thread(target=handle_client, args=(connSocket,))
             tid.start()
 
-            connSocket.close()
-    except:
+            #connSocket.close()
+    except Exception as e:
+        print(e)
         print("Unable to start server")
 
 
