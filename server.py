@@ -4,7 +4,9 @@ import threading
 from socket import *
 import pickle
 
-SERVER_IP = "172.17.0.3"
+
+#Este ip deve estar definido?
+SERVER_IP = ""
 WELCOME_MESSAGE = f"Welcome to {SERVER_IP} file server"
 WELCOME_BLOCKS = 1
 BUFFER_SIZE = 512
@@ -113,8 +115,6 @@ def main():
 
         serverSocket = socket(AF_INET,SOCK_STREAM)
         serverSocket.bind((SERVER_IP, int(server_port)))
-
-        print(server_port)
 
         serverSocket.listen(5)
 
