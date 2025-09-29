@@ -7,11 +7,10 @@ import pickle
 import os
 
 
-max_packet_size = 540
-block_size = 512
+BUFFER_SIZE = 540
+DATA_SIZE = 512
 server_addr = sys.argv[1]
 server_port = sys.argv[2]
-
 
 #opcodes
 RRQ = 1
@@ -19,7 +18,8 @@ DAT = 3
 ACK = 4
 ERR = 5
 
-# Define a custom exception
+
+# Define the FileDoesNotExist exception
 class FileDoesNotExist(Exception):
     pass
 
@@ -38,18 +38,17 @@ def make_ack_block(block_number):
 #Sends a request for the server's directory and
 #prints the result
 def dir(clientSocket):
-
+    #send the request
     filename = ""
     clientSocket.send(form_packet((RRQ, filename)))
-    (_, block_number, size, data) = unpack_packet(clientSocket.recv(max_packet_size))
-
+    (_, block_number, size, data) = unpack_packet(clientSocket.recv(BUFFER_SIZE))
     clientSocket.send(make_ack_block(block_number))
-
+    #print the input
     while size != 0:
         print(data)
-        (_, block_number, size, data) = unpack_packet(clientSocket.recv(max_packet_size))
+        (_, block_number, size, data) = unpack_packet(clientSocket.recv(BUFFER_SIZE))
         clientSocket.send(make_ack_block(block_number))
-    #print(data)
+
 
 #Sends a request for a file and writes the content
 def get(clientSocket, remote_fn, local_fn):
@@ -58,7 +57,7 @@ def get(clientSocket, remote_fn, local_fn):
     expected_block_number = 1
     with open(local_fn, "wb") as f:
         while True:
-            my_packet = unpack_packet(clientSocket.recv(max_packet_size))
+            my_packet = unpack_packet(clientSocket.recv(BUFFER_SIZE))
             opcode = my_packet[0]
             match opcode:
                 case 3:  # Data block
@@ -74,106 +73,27 @@ def get(clientSocket, remote_fn, local_fn):
                     f.write(data)
                     clientSocket.send(make_ack_block(block_number))
                     expected_block_number += 1
-
-                    # If size < 512, last block received
-                    if size < 512:
+                    if size < DATA_SIZE: # This was the last block
                         break
 
                 case 5:  # Error packet
                     if(expected_block_number == 1): # File Does not Exist Exception
                         raise FileDoesNotExist
                     os.remove(local_fn)
-                    print(my_packet[1])
-                    return
+                    print(my_packet[1]) # print error msg
+                    close_connection(clientSocket)
                 case _:  # Protocol error
                     f.close()
                     os.remove(local_fn)
                     close_connection(clientSocket)
-                    return
 
 
-"""
-    #read the first packet
-    my_packet = unpack_packet(clientSocket.recv(max_packet_size))
-    opcode = my_packet[0]
-    match opcode:
-            case 3: #data block
-                (_,block_number, size, data) = my_packet
-                if(block_number != expected_block_number): #protocol error
-                    f.close()
-                    close_connection()
-                    os.remove(local_fn)
-                else:
-                    print(str(data))
-                    f.write(data)
-                    clientSocket.send(make_ack_block(block_number))
-                expected_block_number += 1
-            case 5: # error packet
-                os.remove(local_fn)
-                print(my_packet[1])
-                raise FileDoesNotExist
-            case _: #protocol error
-                f.close()
-                os.remove(local_fn)
-                close_connection(clientSocket)
-
-    my_packet = unpack_packet(clientSocket.recv(max_packet_size))
-    opcode = my_packet[0]
-    while( size == 512):
-        print(f"Received block {block_number}, size {size}")
-        match opcode:
-            case 3: #data block
-                (_,block_number, size, data) = my_packet
-                if(block_number != expected_block_number): #protocol error
-                    close_connection()
-                    os.remove(local_fn)
-                else:
-                    print(str(data))
-                    f.write(data)
-                    clientSocket.send(make_ack_block(block_number))
-                expected_block_number += 1
-            case 5: # error packet
-                os.remove(local_fn)
-                print(my_packet[1])
-            case _: #protocol error
-                f.close()
-                os.remove(local_fn)
-                close_connection(clientSocket)
-        my_packet = unpack_packet(clientSocket.recv(max_packet_size))
-        opcode = my_packet[0]
-    print("I've exited the loop")
-
-    print("I'm going to read the last block")
-    #read the last data packet
-    match opcode:
-            case 3: #data block
-                (_,block_number, size, data) = my_packet
-                if(block_number != expected_block_number): #protocol error
-                    close_connection()
-                    f.close()
-                    os.remove(local_fn)
-                else:
-                    print(str(data))
-                    f.write(data)
-                    clientSocket.send(make_ack_block(block_number))
-                expected_block_number += 1
-            case 5: # error packet
-                f.close()
-                os.remove(local_fn)
-                print(my_packet[1])
-            case _: #protocol error
-                os.remove(local_fn)
-                close_connection(clientSocket)
-                f.close()
-    f.close()
-    print("I'm closing")
-    """
-    
 
 #Closes the TCP connection
 def close_connection(clientSocket):
     clientSocket.close()
     print("Connection close, client ended")
+    sys.exit()
 
 
 
@@ -188,7 +108,7 @@ def main():
         clientSocket.connect((server_addr, int(server_port)))
         print("Connect to server")
         #unpack the data block
-        (opcode, block_number, size, data) = unpack_packet(clientSocket.recv(max_packet_size))
+        (opcode, block_number, size, data) = unpack_packet(clientSocket.recv(BUFFER_SIZE))
         print(data)
         #Send the ack block
         clientSocket.send(make_ack_block(block_number))
