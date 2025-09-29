@@ -31,10 +31,9 @@ def closeSocket(sock):
 def acknowledge(sock, block_count):
     package = sock.recv(MAX_PACKAGE_SIZE)
     opcode, block_number = pickle.loads(package)
-    print("this is ack")
     if not (opcode == ACK and block_number == block_count):
         error = True
-        print("ERRROR", block_count)
+        print("ERROR", block_count)
 
 
 def send_dirs(sock):
@@ -58,20 +57,12 @@ def send_file(filename, sock):
         block_count = 1
         acknowledged = True
         while block_count <= total_blocks and acknowledged:
-            if block_count == total_blocks:
-                size = file_size - (BUFFER_SIZE * total_blocks)
-            else:
-                size = BUFFER_SIZE
-
             file_data = file.read(BUFFER_SIZE)
+            size = len(file_data)
             requested_package = (DAT, block_count, size, file_data)
             sock.send(pickle.dumps(requested_package))
             rp = pickle.dumps(requested_package)
             pickle.loads(rp)
-            print(len(rp))
-
-            print(str(file_data))
-            print(block_count)
             acknowledge(sock, block_count)
 
             if error:
@@ -88,6 +79,7 @@ def analyse_package(op_code, package, sock):
         if filename == DIR_COMMAND:
             send_dirs(sock)
         else:
+            #é preciso imprimir isto?
             print("File requested is ", filename)
             send_file(filename, sock)
     else:
